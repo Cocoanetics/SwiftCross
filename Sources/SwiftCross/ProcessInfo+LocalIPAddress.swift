@@ -28,8 +28,6 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
-#elseif canImport(Bionic)
-import Bionic
 #elseif canImport(WinSDK)
 import WinSDK
 #endif
@@ -41,7 +39,7 @@ extension ProcessInfo {
     public var localIPAddress: String? {
         #if os(Windows)
         return swiftCrossLocalIPAddressWindows()
-        #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || canImport(Bionic)
+        #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
         return swiftCrossLocalIPAddressPOSIX()
         #else
         return nil
@@ -49,8 +47,7 @@ extension ProcessInfo {
     }
 }
 
-#if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || canImport(Bionic)
-
+#if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
 /// Enumerate interfaces with `getifaddrs` and return the address on a physical
 /// interface (`en*` / `eth*` / `wl*`). A routable IPv4 address is preferred; a
 /// non-link-local IPv6 is used as a fallback. Link-local addresses

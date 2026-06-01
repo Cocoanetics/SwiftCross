@@ -4,7 +4,7 @@
 //
 //  `UTType` ships in Apple's UniformTypeIdentifiers framework, which only
 //  exists on Apple platforms. On Linux / Windows / Android we provide a
-//  minimal, source-compatible `UTType` value type backed by a built-in
+//  source-compatible `UTType` value type backed by a comprehensive built-in
 //  filename-extension ↔ MIME-type table, so code that maps between file
 //  extensions and MIME types compiles and runs the same everywhere.
 //
@@ -25,7 +25,7 @@
 
 import Foundation
 
-/// A minimal, cross-platform stand-in for `UniformTypeIdentifiers.UTType`.
+/// A cross-platform stand-in for `UniformTypeIdentifiers.UTType`.
 ///
 /// On Apple platforms `import SwiftCross` re-exports the real `UTType`; this
 /// definition is only compiled where UniformTypeIdentifiers is unavailable.
@@ -75,7 +75,29 @@ public struct UTType: Hashable, Sendable {
             .lowercased() ?? ""
     }
 
-    private static let extensionToMIMEType: [String: String] = [
+    /// Full extension → MIME-type lookup: broad coverage (ported from SwiftMail;
+    /// see the UTType+ExtensionToMIMEType*.swift files) with the curated
+    /// preferred/modern values below winning on any overlap.
+    static let extensionToMIMEType: [String: String] = {
+        var table = extensionToMimeTypePartA
+        table.merge(extensionToMimeTypePartB) { current, _ in current }
+        table.merge(extensionToMimeTypePartC) { current, _ in current }
+        table.merge(extensionToMIMETypeCurated) { _, curated in curated }
+        return table
+    }()
+
+    /// Full MIME-type → extension lookup, built the same way.
+    static let mimeTypeToExtension: [String: String] = {
+        var table = mimeTypeToExtensionPartA
+        table.merge(mimeTypeToExtensionPartB) { current, _ in current }
+        table.merge(mimeTypeToExtensionPartC) { current, _ in current }
+        table.merge(mimeTypeToExtensionCurated) { _, curated in curated }
+        return table
+    }()
+
+    /// Curated, preferred/modern values layered on top of the broad table above
+    /// (e.g. `audio/wav`, `text/javascript`, `image/png`).
+    private static let extensionToMIMETypeCurated: [String: String] = [
         "aac": "audio/aac",
         "avi": "video/x-msvideo",
         "bmp": "image/bmp",
@@ -122,7 +144,7 @@ public struct UTType: Hashable, Sendable {
         "zip": "application/zip",
     ]
 
-    private static let mimeTypeToExtension: [String: String] = [
+    private static let mimeTypeToExtensionCurated: [String: String] = [
         "application/gzip": "gz",
         "application/json": "json",
         "application/jsonl": "jsonl",

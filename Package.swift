@@ -15,10 +15,10 @@ import PackageDescription
 let package = Package(
     name: "SwiftCross",
     platforms: [
-        .macOS(.v13),
-        .iOS(.v16),
-        .tvOS(.v16),
-        .watchOS(.v9),
+        .macOS(.v11),
+        .iOS(.v14),
+        .tvOS(.v14),
+        .watchOS(.v7),
         .visionOS(.v1),
     ],
     products: [

@@ -2,10 +2,15 @@
 //  Hostname.swift
 //  SwiftCross
 //
-//  `Host.current().name` is macOS-only. On other platforms the local
-//  hostname has to come from a libc/Win32 call, and each platform spells it
-//  differently. These helpers paper over that so portable code (SMTP/IMAP
-//  EHLO/HELO, logging, diagnostics) can ask for the hostname once.
+//  Two small helpers so portable code (SMTP/IMAP EHLO/HELO, logging,
+//  diagnostics) can ask for the local hostname / IP once and get a sensible
+//  answer on every platform.
+//
+//  `Foundation.ProcessInfo.hostName` already abstracts the per-platform
+//  hostname lookup (and exists on swift-corelibs-foundation too), so we lean
+//  on it rather than spelling out `gethostname` / `GetComputerNameExW` and
+//  the libc-module differences that come with them. The libc import below is
+//  only for `getifaddrs`, used by `localIPAddress`.
 //
 
 import Foundation
@@ -16,41 +21,18 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
-#elseif canImport(Bionic)
-import Bionic
-#elseif canImport(Android)
-import Android
-#elseif canImport(WinSDK)
-import WinSDK
 #endif
 
 extension String {
 
-    /// The local machine's hostname, resolved consistently across platforms.
+    /// The local machine's hostname.
     ///
-    /// Uses `Host.current().name` on macOS, `GetComputerNameExW` on Windows
-    /// (which, unlike Winsock's `gethostname`, needs no `WSAStartup`), and
-    /// POSIX `gethostname` elsewhere. Falls back to the primary IP address in
-    /// brackets, then to `"localhost"`, if the hostname can't be determined.
+    /// Backed by `ProcessInfo.processInfo.hostName`, which resolves the right
+    /// way per platform. Falls back to the primary IP address in brackets,
+    /// then to `"localhost"`, if no hostname is reported.
     public static var localHostname: String {
-        #if os(macOS) && !targetEnvironment(macCatalyst)
-        if let name = Host.current().name { return name }
-        #elseif os(Windows)
-        var size: DWORD = 256
-        var buffer = [WCHAR](repeating: 0, count: Int(size))
-        if GetComputerNameExW(ComputerNameDnsFullyQualified, &buffer, &size) {
-            let name = String(decodingCString: buffer, as: UTF16.self)
-            if !name.isEmpty { return name }
-        }
-        #else
-        // POSIX HOST_NAME_MAX is 64; 256 is generous headroom.
-        var hostname = [CChar](repeating: 0, count: 256)
-        if gethostname(&hostname, hostname.count) == 0,
-           let name = String(cString: hostname, encoding: .utf8), !name.isEmpty {
-            return name
-        }
-        #endif
-
+        let name = ProcessInfo.processInfo.hostName
+        if !name.isEmpty { return name }
         if let ip = localIPAddress { return "[\(ip)]" }
         return "localhost"
     }

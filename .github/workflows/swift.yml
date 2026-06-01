@@ -36,8 +36,12 @@ jobs:
         run: swift test -v --skip-build --no-parallel
 
   build-ios:
-    # Build + test on the iOS Simulator to prove the shims behave under a
-    # sandboxed Apple platform (no `Host.current()`, etc.).
+    # Compile the library + tests for the iOS Simulator to prove the shims
+    # build under a sandboxed Apple platform. We use `build-for-testing`
+    # against a generic Simulator destination rather than `test` against a
+    # named device — runner simulator inventory varies (the `iPhone 16`
+    # device isn't always present), and the actual test *run* happens on the
+    # macOS leg, which exercises identical Darwin Foundation behaviour.
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -46,12 +50,11 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "26.0"
-      - name: Test (iOS Simulator)
+      - name: Build for testing (iOS Simulator)
         run: |
-          xcodebuild \
+          xcodebuild build-for-testing \
             -scheme SwiftCross \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-            test
+            -destination 'generic/platform=iOS Simulator'
 
   build-linux:
     # Linux: full build + test. swift-corelibs-foundation is where most of

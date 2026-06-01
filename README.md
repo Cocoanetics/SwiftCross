@@ -86,9 +86,9 @@ there; the shim intentionally models only the extension/MIME surface.
 
 ### `String.localHostname` / `String.localIPAddress`
 
-The local hostname, resolved the right way per platform — `Host.current()` on
-macOS, `GetComputerNameExW` on Windows, POSIX `gethostname` elsewhere — with an
-IP-address fallback.
+The local hostname (via `ProcessInfo.hostName`, which abstracts the
+per-platform lookup), with a primary-IP-address fallback resolved through
+`getifaddrs` where that's available.
 
 ```swift
 let helo = String.localHostname   // e.g. "mac-studio.local" / "DESKTOP-AB12" / "ip-10-0-0-5"

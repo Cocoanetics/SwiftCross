@@ -70,7 +70,10 @@ private func swiftCrossLocalIPAddressPOSIX() -> String? {
         let isIPv6 = family == UInt8(AF_INET6)
         guard isIPv4 || isIPv6 else { continue }
 
-        let name = String(cString: interface.ifa_name)
+        // `ifa_name` is a strict optional on the Android overlay (an
+        // implicitly-unwrapped optional on Darwin/glibc), so bind it explicitly.
+        guard let namePointer = interface.ifa_name else { continue }
+        let name = String(cString: namePointer)
         guard name.hasPrefix("en") || name.hasPrefix("eth") || name.hasPrefix("wl") else { continue }
 
         var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
@@ -82,7 +85,9 @@ private func swiftCrossLocalIPAddressPOSIX() -> String? {
             : socklen_t(MemoryLayout<sockaddr_in6>.size)
         #endif
 
-        guard getnameinfo(address, saLen, &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0,
+        // The host-buffer length is `socklen_t` on Darwin/glibc but `Int`
+        // (size_t) on the Android overlay; `numericCast` adapts to either.
+        guard getnameinfo(address, saLen, &host, numericCast(host.count), nil, 0, NI_NUMERICHOST) == 0,
               let resolved = String(cString: host, encoding: .utf8), !resolved.isEmpty else { continue }
 
         if isIPv4 {

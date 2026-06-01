@@ -86,14 +86,17 @@ there; the shim intentionally models only the extension/MIME surface.
 
 ### `ProcessInfo.localIPAddress`
 
-The machine's primary non-loopback IP address. Foundation has no portable API
-for this — it needs `getifaddrs`, which differs per platform and is absent on
-Windows — so SwiftCross adds it as a companion to the built-in, already-portable
-`ProcessInfo.hostName` (no shim needed for the hostname itself).
+The machine's primary routable (non-loopback, non-link-local) IP address —
+something Foundation has no portable API for. A companion to the built-in,
+already-portable `ProcessInfo.hostName` (which needs no shim). Implemented on
+every platform: Apple / Linux / Android enumerate interfaces with `getifaddrs`
+(preferring a routable IPv4); Windows, which has no `getifaddrs`, opens a UDP
+socket and reads back the OS-selected source address with `getsockname` (no
+packet is sent).
 
 ```swift
 let host = ProcessInfo.processInfo.hostName        // built-in, works everywhere
-let ip   = ProcessInfo.processInfo.localIPAddress  // SwiftCross; nil on Windows/Android
+let ip   = ProcessInfo.processInfo.localIPAddress  // SwiftCross; nil if no active interface
 ```
 
 ### `String.Encoding(ianaCharsetName:)`
@@ -115,8 +118,8 @@ let text = String(data: data, encoding: encoding)
 | --- | --- | --- |
 | macOS / iOS / tvOS / watchOS / visionOS | ✅ build + test | Native APIs re-exported |
 | Linux | ✅ build + test | Primary shim target (`swift-corelibs-foundation`) |
-| Windows | ✅ build + test | `localIPAddress` returns `nil` (no `getifaddrs`) |
-| Android | ✅ build (library) | `localIPAddress` returns `nil` |
+| Windows | ✅ build + test | `localIPAddress` via a UDP socket (no `getifaddrs`) |
+| Android | ✅ build (library) | Compile-only in CI (no emulator run) |
 
 Every platform is exercised in [CI](.github/workflows/swift.yml) on each push.
 

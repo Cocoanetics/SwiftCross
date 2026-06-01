@@ -84,14 +84,16 @@ On Apple platforms the real `UTType` is re-exported unchanged, so its full UTI
 hierarchy (conformances, supertypes, system-declared types) stays available
 there; the shim intentionally models only the extension/MIME surface.
 
-### `String.localHostname` / `String.localIPAddress`
+### `ProcessInfo.localIPAddress`
 
-The local hostname (via `ProcessInfo.hostName`, which abstracts the
-per-platform lookup), with a primary-IP-address fallback resolved through
-`getifaddrs` where that's available.
+The machine's primary non-loopback IP address. Foundation has no portable API
+for this — it needs `getifaddrs`, which differs per platform and is absent on
+Windows — so SwiftCross adds it as a companion to the built-in, already-portable
+`ProcessInfo.hostName` (no shim needed for the hostname itself).
 
 ```swift
-let helo = String.localHostname   // e.g. "mac-studio.local" / "DESKTOP-AB12" / "ip-10-0-0-5"
+let host = ProcessInfo.processInfo.hostName        // built-in, works everywhere
+let ip   = ProcessInfo.processInfo.localIPAddress  // SwiftCross; nil on Windows/Android
 ```
 
 ### `String.Encoding(ianaCharsetName:)`

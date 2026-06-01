@@ -1,16 +1,14 @@
 //
-//  Hostname.swift
+//  ProcessInfo+LocalIPAddress.swift
 //  SwiftCross
 //
-//  Two small helpers so portable code (SMTP/IMAP EHLO/HELO, logging,
-//  diagnostics) can ask for the local hostname / IP once and get a sensible
-//  answer on every platform.
+//  For the local hostname, no shim is needed: Foundation already exposes
+//  `ProcessInfo.processInfo.hostName` on every platform (it's implemented on
+//  swift-corelibs-foundation too), so use that directly.
 //
-//  `Foundation.ProcessInfo.hostName` already abstracts the per-platform
-//  hostname lookup (and exists on swift-corelibs-foundation too), so we lean
-//  on it rather than spelling out `gethostname` / `GetComputerNameExW` and
-//  the libc-module differences that come with them. The libc import below is
-//  only for `getifaddrs`, used by `localIPAddress`.
+//  What Foundation has no portable API for is the machine's *own* IP address.
+//  That requires `getifaddrs`, which differs across platforms and is absent on
+//  Windows — so SwiftCross adds it as a companion to the built-in `hostName`.
 //
 
 import Foundation
@@ -23,27 +21,15 @@ import Glibc
 import Musl
 #endif
 
-extension String {
-
-    /// The local machine's hostname.
-    ///
-    /// Backed by `ProcessInfo.processInfo.hostName`, which resolves the right
-    /// way per platform. Falls back to the primary IP address in brackets,
-    /// then to `"localhost"`, if no hostname is reported.
-    public static var localHostname: String {
-        let name = ProcessInfo.processInfo.hostName
-        if !name.isEmpty { return name }
-        if let ip = localIPAddress { return "[\(ip)]" }
-        return "localhost"
-    }
+extension ProcessInfo {
 
     /// The machine's primary non-loopback IPv4/IPv6 address over a physical
     /// interface (`en*` / `eth*` / `wl*`), or `nil` if it can't be found.
     ///
     /// Implemented with `getifaddrs`, which is unavailable on Windows and not
-    /// dependably exposed by the Android libc overlay; this returns `nil`
-    /// there rather than failing to build.
-    public static var localIPAddress: String? {
+    /// dependably exposed by the Android libc overlay; returns `nil` there
+    /// rather than failing to build.
+    public var localIPAddress: String? {
         #if canImport(Darwin) || canImport(Glibc) || canImport(Musl)
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr else { return nil }

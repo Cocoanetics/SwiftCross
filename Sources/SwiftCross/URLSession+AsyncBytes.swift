@@ -104,6 +104,23 @@ extension URLSession {
         try await streamingBytes(for: URLRequest(url: url))
     }
 
+    /// Replace only the URLSession timeouts that swift-corelibs-foundation
+    /// can't handle, leaving every other value untouched.
+    ///
+    /// corelibs computes `Int(timeout) * 1000` for libcurl in
+    /// `configureEasyHandle`, so a non-finite timeout (`Int(.infinity)` /
+    /// `Int(.nan)` trap with SIGILL) or one large enough to overflow `Int`
+    /// crashes. Those — and only those — are clamped to the largest safe
+    /// value. Realistic finite timeouts (days, weeks, months, …) pass through
+    /// unchanged, so a caller's configured duration is never silently shortened.
+    ///
+    /// `2^53` is the largest `TimeInterval` that is exactly representable and
+    /// still keeps `Int(timeout) * 1000` within `Int`.
+    static func swiftCrossSafeTimeout(_ timeout: TimeInterval) -> TimeInterval {
+        let maxSafe = TimeInterval(1 << 53)
+        return (timeout.isFinite && timeout <= maxSafe) ? timeout : maxSafe
+    }
+
     private func streamingBytes(for request: URLRequest) async throws -> (AsyncBytes, URLResponse) {
         let (chunks, continuation) = AsyncThrowingStream<Data, Error>.makeStream()
 
@@ -119,7 +136,16 @@ extension URLSession {
                 chunkContinuation: continuation,
                 responseContinuation: responseContinuation
             )
-            let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+            // Clamp non-finite / oversized timeouts before they reach
+            // corelibs-foundation's libcurl setup (`configureEasyHandle`),
+            // where `Int(.infinity)` would trap. `configuration` is already a
+            // copy, so mutating it here is safe.
+            let safeConfiguration = configuration
+            safeConfiguration.timeoutIntervalForRequest =
+                URLSession.swiftCrossSafeTimeout(safeConfiguration.timeoutIntervalForRequest)
+            safeConfiguration.timeoutIntervalForResource =
+                URLSession.swiftCrossSafeTimeout(safeConfiguration.timeoutIntervalForResource)
+            let session = URLSession(configuration: safeConfiguration, delegate: delegate, delegateQueue: nil)
             let task = session.dataTask(with: request)
             // `URLSessionDataTask` / `URLSession` aren't `Sendable`; box them
             // so the @Sendable termination handler can own their teardown.

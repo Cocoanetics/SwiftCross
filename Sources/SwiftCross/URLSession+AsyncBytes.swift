@@ -104,6 +104,16 @@ extension URLSession {
         try await streamingBytes(for: URLRequest(url: url))
     }
 
+    /// Clamp a session timeout to a finite, overflow-safe value for
+    /// swift-corelibs-foundation, which computes `Int(timeout) * 1000` for
+    /// libcurl in `configureEasyHandle`: `.infinity`/`.nan` trap (SIGILL) and
+    /// very large finite values can overflow. Non-finite or oversized timeouts
+    /// are clamped to ~1 week, effectively unbounded for a streaming request.
+    static func swiftCrossSafeTimeout(_ timeout: TimeInterval) -> TimeInterval {
+        let ceiling: TimeInterval = 60 * 60 * 24 * 7  // 1 week
+        return (timeout.isFinite && timeout <= ceiling) ? timeout : ceiling
+    }
+
     private func streamingBytes(for request: URLRequest) async throws -> (AsyncBytes, URLResponse) {
         let (chunks, continuation) = AsyncThrowingStream<Data, Error>.makeStream()
 
@@ -119,7 +129,16 @@ extension URLSession {
                 chunkContinuation: continuation,
                 responseContinuation: responseContinuation
             )
-            let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+            // Clamp non-finite / oversized timeouts before they reach
+            // corelibs-foundation's libcurl setup (`configureEasyHandle`),
+            // where `Int(.infinity)` would trap. `configuration` is already a
+            // copy, so mutating it here is safe.
+            let safeConfiguration = configuration
+            safeConfiguration.timeoutIntervalForRequest =
+                URLSession.swiftCrossSafeTimeout(safeConfiguration.timeoutIntervalForRequest)
+            safeConfiguration.timeoutIntervalForResource =
+                URLSession.swiftCrossSafeTimeout(safeConfiguration.timeoutIntervalForResource)
+            let session = URLSession(configuration: safeConfiguration, delegate: delegate, delegateQueue: nil)
             let task = session.dataTask(with: request)
             // `URLSessionDataTask` / `URLSession` aren't `Sendable`; box them
             // so the @Sendable termination handler can own their teardown.

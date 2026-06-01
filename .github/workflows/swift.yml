@@ -90,23 +90,18 @@ jobs:
         run: swift test -v --skip-build --no-parallel
 
   build-android:
-    # Library-only compile against the swift.org Android SDK. The XCTest
-    # bundle is an executable and trips the action's standalone-Bionic-ELF
-    # link path, so we build the SwiftCross library target directly and skip
-    # the emulator/test phase — compiling the library is what proves the
-    # Android arms of the shims (gethostname path, FoundationNetworking
-    # AsyncBytes, the UTType stand-in) are sound.
+    # Full build + unit-test run on the Android emulator. SwiftCross is pure
+    # Swift with no C dependencies and no executable targets, so the XCTest
+    # bundle links and runs cleanly under the swift.org Android SDK — letting
+    # the action build the package, build the tests, and run them on an
+    # emulator (all defaults). All suites are network-free and deterministic,
+    # so they're emulator-safe.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
-      - name: Install Swift Android SDK
+      - name: Build + test (Android emulator)
         uses: skiptools/swift-android-action@v2
         with:
           swift-version: "6.3.2"
           free-disk-space: true
-          build-package: false
-          build-tests: false
-          run-tests: false
-      - name: Build library (Android)
-        run: swift build --swift-sdk "$SWIFT_SDK_TARGET" --target SwiftCross

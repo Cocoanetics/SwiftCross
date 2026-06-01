@@ -119,7 +119,7 @@ let text = String(data: data, encoding: encoding)
 | macOS / iOS / tvOS / watchOS / visionOS | ✅ build + test | Native APIs re-exported |
 | Linux | ✅ build + test | Primary shim target (`swift-corelibs-foundation`) |
 | Windows | ✅ build + test | `localIPAddress` via a UDP socket (no `getifaddrs`) |
-| Android | ✅ build (library) | Compile-only in CI (no emulator run) |
+| Android | ✅ build + test | Unit tests run on the emulator (API 28) |
 
 Every platform is exercised in [CI](.github/workflows/swift.yml) on each push.
 

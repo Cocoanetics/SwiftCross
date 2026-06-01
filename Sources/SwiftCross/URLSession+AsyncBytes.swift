@@ -104,14 +104,21 @@ extension URLSession {
         try await streamingBytes(for: URLRequest(url: url))
     }
 
-    /// Clamp a session timeout to a finite, overflow-safe value for
-    /// swift-corelibs-foundation, which computes `Int(timeout) * 1000` for
-    /// libcurl in `configureEasyHandle`: `.infinity`/`.nan` trap (SIGILL) and
-    /// very large finite values can overflow. Non-finite or oversized timeouts
-    /// are clamped to ~1 week, effectively unbounded for a streaming request.
+    /// Replace only the URLSession timeouts that swift-corelibs-foundation
+    /// can't handle, leaving every other value untouched.
+    ///
+    /// corelibs computes `Int(timeout) * 1000` for libcurl in
+    /// `configureEasyHandle`, so a non-finite timeout (`Int(.infinity)` /
+    /// `Int(.nan)` trap with SIGILL) or one large enough to overflow `Int`
+    /// crashes. Those — and only those — are clamped to the largest safe
+    /// value. Realistic finite timeouts (days, weeks, months, …) pass through
+    /// unchanged, so a caller's configured duration is never silently shortened.
+    ///
+    /// `2^53` is the largest `TimeInterval` that is exactly representable and
+    /// still keeps `Int(timeout) * 1000` within `Int`.
     static func swiftCrossSafeTimeout(_ timeout: TimeInterval) -> TimeInterval {
-        let ceiling: TimeInterval = 60 * 60 * 24 * 7  // 1 week
-        return (timeout.isFinite && timeout <= ceiling) ? timeout : ceiling
+        let maxSafe = TimeInterval(1 << 53)
+        return (timeout.isFinite && timeout <= maxSafe) ? timeout : maxSafe
     }
 
     private func streamingBytes(for request: URLRequest) async throws -> (AsyncBytes, URLResponse) {

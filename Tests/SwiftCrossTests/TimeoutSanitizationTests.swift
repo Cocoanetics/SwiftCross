@@ -5,7 +5,8 @@
 //
 // swift-corelibs-foundation computes `Int(timeout) * 1000` for libcurl in
 // `_HTTPURLProtocol.configureEasyHandle`, so a `.infinity` timeout traps with
-// SIGILL (and a huge finite value overflows). These tests pin the clamp.
+// SIGILL (and an `Int`-overflowing finite value also traps). Only those are
+// replaced; ordinary finite durations must pass through unchanged.
 #if canImport(FoundationNetworking)
 
 import XCTest
@@ -15,26 +16,24 @@ import FoundationNetworking
 
 final class TimeoutSanitizationTests: XCTestCase {
 
-    private let ceiling: TimeInterval = 60 * 60 * 24 * 7  // 1 week
+    private let maxSafe = TimeInterval(1 << 53)
 
-    func testInfiniteTimeoutIsClamped() {
-        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(.infinity), ceiling)
+    func testNonFiniteTimeoutsAreClamped() {
+        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(.infinity), maxSafe)
+        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(.nan), maxSafe)
     }
 
-    func testNaNTimeoutIsClamped() {
-        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(.nan), ceiling)
+    func testOverflowProneFiniteTimeoutIsClamped() {
+        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(.greatestFiniteMagnitude), maxSafe)
     }
 
-    func testFiniteTimeoutsArePreserved() {
+    func testRealisticFiniteTimeoutsArePreservedUnchanged() {
+        // The whole point: a caller's configured duration is never shortened.
         XCTAssertEqual(URLSession.swiftCrossSafeTimeout(60), 60)
-        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(ceiling), ceiling)
-        // The default `timeoutIntervalForResource` (7 days) must survive.
-        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(604_800), 604_800)
-    }
-
-    func testOversizedFiniteTimeoutIsClamped() {
-        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(.greatestFiniteMagnitude), ceiling)
-        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(ceiling + 1), ceiling)
+        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(604_800), 604_800)        // 1 week
+        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(60 * 60 * 24 * 30), 60 * 60 * 24 * 30)  // 30 days
+        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(60 * 60 * 24 * 365), 60 * 60 * 24 * 365) // 1 year
+        XCTAssertEqual(URLSession.swiftCrossSafeTimeout(maxSafe), maxSafe)
     }
 }
 

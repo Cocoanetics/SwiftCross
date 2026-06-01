@@ -39,5 +39,17 @@ final class UTTypeTests: XCTestCase {
         XCTAssertNil(UTType(mimeType: "application/x-not-real"))
         XCTAssertNil(UTType(filenameExtension: ""))
     }
+
+    // Comprehensive table coverage (ported from SwiftMail): types beyond the
+    // small curated set must resolve on the shim. Regression guard for the
+    // extension/MIME tables.
+    func testComprehensiveCoverageShim() throws {
+        XCTAssertEqual(UTType(mimeType: "message/rfc822")?.preferredFilenameExtension, "eml")
+        XCTAssertEqual(UTType(mimeType: "text/calendar")?.preferredFilenameExtension, "ics")
+        XCTAssertEqual(UTType(mimeType: "video/webm")?.preferredFilenameExtension, "webm")
+        XCTAssertEqual(UTType(filenameExtension: "eml")?.preferredMIMEType, "message/rfc822")
+        XCTAssertEqual(UTType(filenameExtension: "ics")?.preferredMIMEType, "text/calendar")
+        XCTAssertEqual(UTType(filenameExtension: "webm")?.preferredMIMEType, "video/webm")
+    }
     #endif
 }

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="SwiftCross.jpg" alt="SwiftCross" width="256">
+</p>
+
 # SwiftCross
 
 [![Swift](https://github.com/Cocoanetics/SwiftCross/actions/workflows/swift.yml/badge.svg)](https://github.com/Cocoanetics/SwiftCross/actions/workflows/swift.yml)
